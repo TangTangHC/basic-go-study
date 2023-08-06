@@ -57,6 +57,10 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "邮箱格式不正确")
 		return
 	}
+	if userReq.Password != userReq.ConfirmPassword {
+		ctx.String(http.StatusOK, "两次密码不同，重新输入")
+		return
+	}
 	ok, err = h.passwordExp.MatchString(userReq.Password)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
@@ -82,7 +86,29 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 }
 
 func (h *UserHandler) Login(ctx *gin.Context) {
-
+	type loginRes struct {
+		Email    string
+		Password string
+	}
+	var res loginRes
+	if err := ctx.Bind(&res); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	_, err := h.uSer.Login(ctx.Request.Context(), res.Email, res.Password)
+	if err == service.ErrEmailNotSignup {
+		ctx.String(http.StatusOK, err.Error())
+		return
+	}
+	if err == service.ErrInvalidUserOrEmail {
+		ctx.String(http.StatusOK, err.Error())
+		return
+	}
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.String(http.StatusOK, "登录成功")
 }
 
 func (h *UserHandler) Profile(ctx *gin.Context) {
