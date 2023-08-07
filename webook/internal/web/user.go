@@ -4,8 +4,10 @@ import (
 	"github.com/TangTangHC/basic-go-study/webook/internal/domain"
 	"github.com/TangTangHC/basic-go-study/webook/internal/service"
 	regexp "github.com/dlclark/regexp2"
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"strconv"
 )
 
 type UserHandler struct {
@@ -95,7 +97,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	_, err := h.uSer.Login(ctx.Request.Context(), res.Email, res.Password)
+	user, err := h.uSer.Login(ctx.Request.Context(), res.Email, res.Password)
 	if err == service.ErrEmailNotSignup {
 		ctx.String(http.StatusOK, err.Error())
 		return
@@ -108,9 +110,18 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
+	sess := sessions.Default(ctx)
+	sess.Set("userId", user.Id)
+	err = sess.Save()
 	ctx.String(http.StatusOK, "登录成功")
 }
 
 func (h *UserHandler) Profile(ctx *gin.Context) {
-
+	sess := sessions.Default(ctx)
+	userId := sess.Get("userId")
+	if v, ok := userId.(int64); !ok {
+		ctx.String(http.StatusOK, "用户名获取错误")
+	} else {
+		ctx.String(http.StatusOK, strconv.Itoa(int(v)))
+	}
 }

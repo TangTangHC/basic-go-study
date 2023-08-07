@@ -5,7 +5,10 @@ import (
 	"github.com/TangTangHC/basic-go-study/webook/internal/repository/dao"
 	"github.com/TangTangHC/basic-go-study/webook/internal/service"
 	"github.com/TangTangHC/basic-go-study/webook/internal/web"
+	"github.com/TangTangHC/basic-go-study/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -26,6 +29,12 @@ func main() {
 			return strings.HasPrefix(origin, "http://localhost")
 		},
 	}))
+	store := cookie.NewStore([]byte("secret"))
+	server.Use(sessions.Sessions("mysession", store))
+
+	loginMiddleWareBuilder := middleware.NewLoginMiddleWareBuilder()
+	server.Use(loginMiddleWareBuilder.IgnorePath("/users/signup").IgnorePath("/users/login").Builder())
+
 	userHandler := initUserHandler(db)
 	userHandler.RegisterHandler(server)
 	err := server.Run(":8080")
