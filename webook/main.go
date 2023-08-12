@@ -52,6 +52,7 @@ func initUserHandler(db *gorm.DB) *web.UserHandler {
 
 func initDB() *gorm.DB {
 	db, err := gorm.Open(mysql.Open("root:root@tcp(localhost:3306)/g_webook"))
+	db = db.Debug()
 	if err != nil {
 		panic("系统初始化错误")
 	}

@@ -1,13 +1,20 @@
 package web
 
 import (
+	"errors"
+	"fmt"
 	"github.com/TangTangHC/basic-go-study/webook/internal/domain"
 	"github.com/TangTangHC/basic-go-study/webook/internal/service"
 	regexp "github.com/dlclark/regexp2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"net/http"
-	"strconv"
+	"time"
+	"unicode/utf8"
+)
+
+var (
+	ErrMsgMoreThanMaxLen = errors.New("%s最多可输入%d个字")
 )
 
 type UserHandler struct {
@@ -36,6 +43,7 @@ func (h *UserHandler) RegisterHandler(server *gin.Engine) {
 	routerGroup.POST("/signup", h.SignUp)
 	routerGroup.POST("/login", h.Login)
 	routerGroup.POST("/profile", h.Profile)
+	routerGroup.POST("/edit", h.Edit)
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -118,10 +126,77 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 
 func (h *UserHandler) Profile(ctx *gin.Context) {
 	sess := sessions.Default(ctx)
-	userId := sess.Get("userId")
-	if v, ok := userId.(int64); !ok {
+	sUserId := sess.Get("userId")
+	userId, ok := sUserId.(int64)
+	if !ok {
 		ctx.String(http.StatusOK, "用户名获取错误")
-	} else {
-		ctx.String(http.StatusOK, strconv.Itoa(int(v)))
+		return
 	}
+
+	type userRes struct {
+		Email     string `json:"email"`
+		NikeName  string `json:"nikeName"`
+		Birthday  string `json:"birthday"`
+		Signature string `json:"signature"`
+	}
+	user, err := h.uSer.Profile(ctx, userId)
+	if err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.JSON(http.StatusOK, &userRes{
+		Email:     user.Email,
+		NikeName:  user.NikeName,
+		Birthday:  user.Birthday,
+		Signature: user.Signature,
+	})
+}
+
+func (h *UserHandler) Edit(ctx *gin.Context) {
+	type userReq struct {
+		NikeName  string `json:"nikeName"`
+		Birthday  string `json:"birthday"`
+		Signature string `json:"signature"`
+	}
+	var req userReq
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	if l := utf8.RuneCountInString(req.NikeName); l > 20 {
+		ctx.String(http.StatusOK, fmt.Sprintf(ErrMsgMoreThanMaxLen.Error(), "nikeName", 20))
+		return
+	}
+
+	if l := utf8.RuneCountInString(req.Signature); l > 500 {
+		ctx.String(http.StatusOK, fmt.Sprintf(ErrMsgMoreThanMaxLen.Error(), "signature", 500))
+		return
+	}
+
+	if len(req.Birthday) > 0 {
+		_, err := time.Parse("2006-01-02", req.Birthday)
+		if err != nil {
+			ctx.String(http.StatusOK, "birthday 格式错误")
+			return
+		}
+	}
+
+	sess := sessions.Default(ctx)
+	sessVal := sess.Get("userId")
+	userId, ok := sessVal.(int64)
+	if !ok {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	err := h.uSer.Edit(ctx.Request.Context(), domain.User{
+		Id:        userId,
+		NikeName:  req.NikeName,
+		Birthday:  req.Birthday,
+		Signature: req.Signature,
+	})
+	if err != nil {
+		ctx.String(http.StatusOK, "客户信息编辑失败")
+		return
+	}
+	ctx.String(http.StatusOK, "客户信息编辑成功")
 }

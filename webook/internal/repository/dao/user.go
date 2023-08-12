@@ -3,6 +3,7 @@ package dao
 import (
 	"context"
 	"errors"
+	"github.com/gin-gonic/gin"
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 	"time"
@@ -41,10 +42,23 @@ func (u *UserDao) FindByEmail(ctx context.Context, email string) (User, error) {
 	return user, err
 }
 
+func (u *UserDao) UpdateById(ctx context.Context, user User) error {
+	return u.db.WithContext(ctx).Updates(&user).Error
+}
+
+func (u *UserDao) FindById(ctx *gin.Context, id int64) (User, error) {
+	var user User
+	err := u.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
+	return user, err
+}
+
 type User struct {
-	Id       int64  `gorm:"primaryKey"`
-	Email    string `gorm:"unique"`
-	Password string
-	Ctime    int64
-	Utime    int64
+	Id        int64  `gorm:"primaryKey"`
+	Email     string `gorm:"unique"`
+	Password  string
+	NikeName  string
+	Birthday  string
+	Signature string
+	Ctime     int64
+	Utime     int64
 }

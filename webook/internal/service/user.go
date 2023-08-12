@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/TangTangHC/basic-go-study/webook/internal/domain"
 	"github.com/TangTangHC/basic-go-study/webook/internal/repository"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -44,4 +45,12 @@ func (u *UserService) Login(ctx context.Context, email string, password string) 
 		return domain.User{}, ErrInvalidUserOrEmail
 	}
 	return user, nil
+}
+
+func (u *UserService) Edit(ctx context.Context, edit domain.User) error {
+	return u.uRepo.UpdateById(ctx, edit)
+}
+
+func (u *UserService) Profile(ctx *gin.Context, id int64) (user domain.User, err error) {
+	return u.uRepo.FindById(ctx, id)
 }
