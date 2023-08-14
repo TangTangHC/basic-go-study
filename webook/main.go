@@ -8,7 +8,7 @@ import (
 	"github.com/TangTangHC/basic-go-study/webook/internal/web/middleware"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
+	"github.com/gin-contrib/sessions/memstore"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -23,13 +23,19 @@ func main() {
 	server.Use(cors.New(cors.Config{
 		AllowMethods:     []string{"POST", "GET", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"x-jwt-token"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 		AllowOriginFunc: func(origin string) bool {
 			return strings.HasPrefix(origin, "http://localhost")
 		},
 	}))
-	store := cookie.NewStore([]byte("secret"))
+	//store := cookie.NewStore([]byte("secret"))
+	store := memstore.NewStore([]byte("OxBC4Y5fWGcsGoTlQpYIr4HzDAcZTyk4kbUFK2MqSPyWKJJ9A3JrStYXOYktSb3B"),
+		[]byte("PiZuMqQnEdbgsfHcYwBoduDtGbnaK7dj"))
+	//store := memstore.NewStore([]byte("secret"))
+	//store, _ := redis.NewStore(6, "tcp", "localhost:6379", "", []byte("OxBC4Y5fWGcsGoTlQpYIr4HzDAcZTyk4kbUFK2MqSPyWKJJ9A3JrStYXOYktSb3B"),
+	//	[]byte("PiZuMqQnEdbgsfHcYwBoduDtGbnaK7dj"))
 	server.Use(sessions.Sessions("mysession", store))
 
 	loginMiddleWareBuilder := middleware.NewLoginMiddleWareBuilder()
