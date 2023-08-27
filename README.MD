@@ -1,6 +1,6 @@
 # 第三次作业 修改已有的部署方案
 ![img.png](picture/k8s详情.png)
-![img.png](picture/登录成功相应.png)
+
 
 # 第二次作业
 ```sql
