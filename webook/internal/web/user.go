@@ -6,7 +6,6 @@ import (
 	"github.com/TangTangHC/basic-go-study/webook/internal/domain"
 	"github.com/TangTangHC/basic-go-study/webook/internal/service"
 	regexp "github.com/dlclark/regexp2"
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"net/http"
@@ -200,15 +199,20 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 		}
 	}
 
-	sess := sessions.Default(ctx)
-	sessVal := sess.Get("userId")
-	userId, ok := sessVal.(int64)
+	//sess := sessions.Default(ctx)
+	//sessVal := sess.Get("userId")
+	//userId, ok := sessVal.(int64)
+	value, ok := ctx.Get("token")
 	if !ok {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
+	claims, ok := value.(*UserClaims)
+	if !ok {
+		//监控这里
+	}
 	err := h.uSer.Edit(ctx.Request.Context(), domain.User{
-		Id:        userId,
+		Id:        claims.UId,
 		NikeName:  req.NikeName,
 		Birthday:  req.Birthday,
 		Signature: req.Signature,
