@@ -8,8 +8,8 @@ import (
 )
 
 type LocalCodeCache struct {
-	hash    sync.Map
-	rmQueue []*queueValue
+	hash sync.Map
+	sec  int
 }
 
 type value struct {
@@ -24,10 +24,14 @@ type queueValue struct {
 	endTime time.Time
 }
 
-func NewLocalCodeCache() *LocalCodeCache {
-	rmQ := make([]*queueValue, 0, 128)
-	l := &LocalCodeCache{rmQueue: rmQ}
-	ticker := time.NewTicker(5 * time.Minute)
+func NewLocalCodeCache(sec int) *LocalCodeCache {
+	if sec <= 0 {
+		sec = 60 * 5
+	}
+	l := &LocalCodeCache{
+		sec: sec,
+	}
+	ticker := time.NewTicker(time.Duration(sec) * time.Second)
 	stop := make(chan struct{})
 	go func() {
 		for {
@@ -73,8 +77,9 @@ func (l *LocalCodeCache) Set(ctx context.Context, biz, phone, code string) error
 		}
 	}
 	l.hash.Store(key, &value{
-		starTime:   now,
-		endTime:    now.Add(600 * time.Second),
+		starTime: now,
+		endTime:  now.Add(600 * time.Second),
+		//endTime:    now.Add(600 * time.Millisecond),
 		visitCount: 3,
 		code:       code,
 	})
