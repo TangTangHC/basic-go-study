@@ -69,7 +69,6 @@ func (l *LoginMiddleWareBuilder) Builder() gin.HandlerFunc {
 				log.Println("刷新token失败")
 			}
 			ctx.Header("x-jwt-token", signedString)
-
 		}
 		ctx.Set("token", userClaims)
 	}

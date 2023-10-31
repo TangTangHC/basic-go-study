@@ -20,10 +20,11 @@ var (
 type UserHandler struct {
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
-	uSer        *service.UserService
+	uSvc        service.UserService
+	cSvc        *service.CodeService
 }
 
-func NewUserHandler(uSer *service.UserService) *UserHandler {
+func NewUserHandler(uSvc service.UserService, cSvc *service.CodeService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&~])[A-Za-z\d$@$!%*#?&~]{8,}$`
@@ -33,7 +34,8 @@ func NewUserHandler(uSer *service.UserService) *UserHandler {
 	return &UserHandler{
 		emailExp:    emailExp,
 		passwordExp: passwordExp,
-		uSer:        uSer,
+		uSvc:        uSvc,
+		cSvc:        cSvc,
 	}
 }
 
@@ -44,6 +46,10 @@ func (h *UserHandler) RegisterHandler(server *gin.Engine) {
 	routerGroup.POST("/login", h.Login)
 	routerGroup.GET("/profile", h.Profile)
 	routerGroup.POST("/edit", h.Edit)
+
+	routerGroup.POST("/login_sms/code/send", h.SendLoginSMSCode)
+	routerGroup.POST("/login_sms", h.LoginSMS)
+
 }
 
 func (h *UserHandler) SignUp(ctx *gin.Context) {
@@ -80,7 +86,7 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "密码必须大于8位，包含数字、特殊字符")
 		return
 	}
-	err = h.uSer.SignUp(ctx.Request.Context(), domain.User{
+	err = h.uSvc.SignUp(ctx.Request.Context(), domain.User{
 		Email:    userReq.Email,
 		Password: userReq.Password,
 	})
@@ -105,7 +111,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	user, err := h.uSer.Login(ctx.Request.Context(), res.Email, res.Password)
+	user, err := h.uSvc.Login(ctx.Request.Context(), res.Email, res.Password)
 	if err == service.ErrEmailNotSignup {
 		ctx.String(http.StatusOK, err.Error())
 		return
@@ -124,17 +130,7 @@ func (h *UserHandler) Login(ctx *gin.Context) {
 	//	MaxAge: 30,
 	//})
 	//err = sess.Save()
-	claims := UserClaims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 10)),
-		},
-		UId:       user.Id,
-		UserAgent: ctx.Request.UserAgent(),
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
-	signingString, err := token.SignedString([]byte("TyrmfzW2KnkH0HRfIH6lzd5XsQtrM31O"))
-	ctx.Header("x-jwt-token", signingString)
-	ctx.String(http.StatusOK, "登录成功")
+	h.setJWTToken(ctx, user.Id)
 }
 
 func (h *UserHandler) Profile(ctx *gin.Context) {
@@ -157,7 +153,7 @@ func (h *UserHandler) Profile(ctx *gin.Context) {
 		Birthday  string `json:"birthday"`
 		Signature string `json:"signature"`
 	}
-	user, err := h.uSer.Profile(ctx, v.UId)
+	user, err := h.uSvc.Profile(ctx, v.UId)
 	if err != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
@@ -211,7 +207,7 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 	if !ok {
 		//监控这里
 	}
-	err := h.uSer.Edit(ctx.Request.Context(), domain.User{
+	err := h.uSvc.Edit(ctx.Request.Context(), domain.User{
 		Id:        claims.UId,
 		NikeName:  req.NikeName,
 		Birthday:  req.Birthday,
@@ -222,6 +218,89 @@ func (h *UserHandler) Edit(ctx *gin.Context) {
 		return
 	}
 	ctx.String(http.StatusOK, "客户信息编辑成功")
+}
+
+func (h *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+	}
+	const biz = "login"
+	var req Req
+	if err := ctx.BindJSON(&req); err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	err := h.cSvc.Send(ctx, biz, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "发送成功",
+	})
+}
+
+func (h *UserHandler) LoginSMS(ctx *gin.Context) {
+	type Req struct {
+		Phone string `json:"phone"`
+		Code  string `json:"code"`
+	}
+	var req Req
+	if err := ctx.BindJSON(&req); err != nil {
+		return
+	}
+	const biz = "login"
+	ok, err := h.cSvc.Verify(ctx, biz, req.Phone, req.Code)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统异常",
+		})
+		return
+	}
+	if !ok {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 4,
+			Msg:  "验证码校验失败",
+		})
+		return
+	}
+	// 判断是否 新用户 注册
+	user, err := h.uSvc.FindOrCreate(ctx, req.Phone)
+	if err != nil {
+		ctx.JSON(http.StatusOK, Result{
+			Code: 5,
+			Msg:  "系统错误",
+		})
+		return
+	}
+	if err = h.setJWTToken(ctx, user.Id); err != nil {
+		ctx.String(http.StatusOK, "系统错误")
+		return
+	}
+	ctx.String(http.StatusOK, "登录成功")
+	return
+}
+
+func (u *UserHandler) setJWTToken(ctx *gin.Context, uid int64) error {
+	claims := UserClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 10)),
+		},
+		UId:       uid,
+		UserAgent: ctx.Request.UserAgent(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
+	signingString, err := token.SignedString([]byte("TyrmfzW2KnkH0HRfIH6lzd5XsQtrM31O"))
+	ctx.Header("x-jwt-token", signingString)
+	ctx.String(http.StatusOK, "登录成功")
+	return err
 }
 
 type UserClaims struct {

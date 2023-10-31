@@ -2,30 +2,29 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"github.com/TangTangHC/basic-go-study/webook/internal/domain"
+	"github.com/TangTangHC/basic-go-study/webook/internal/repository/cache/redis"
 	"github.com/TangTangHC/basic-go-study/webook/internal/repository/dao"
-	"github.com/gin-gonic/gin"
 	"time"
 )
 
 var (
-	ErrUserDuplicateEmail = dao.ErrUserDuplicateEmail
-	ErrUserNotFound       = dao.ErrUserNotFound
+	ErrUserDuplicate = dao.ErrUserDuplicate
+	ErrUserNotFound  = dao.ErrUserNotFound
 )
 
 type UserRepository struct {
-	dao *dao.UserDao
+	dao   *dao.UserDao
+	cache *redis.RedisUserCache
 }
 
-func NewUserRepository(dao *dao.UserDao) *UserRepository {
-	return &UserRepository{dao: dao}
+func NewUserRepository(dao *dao.UserDao, cache *redis.RedisUserCache) *UserRepository {
+	return &UserRepository{dao: dao, cache: cache}
 }
 
 func (u *UserRepository) Create(ctx context.Context, user domain.User) error {
-	return u.dao.Insert(ctx, dao.User{
-		Email:    user.Email,
-		Password: user.Password,
-	})
+	return u.dao.Insert(ctx, u.domainToEntity(user))
 }
 
 func (u *UserRepository) FindByEmail(ctx context.Context, email string) (domain.User, error) {
@@ -33,34 +32,74 @@ func (u *UserRepository) FindByEmail(ctx context.Context, email string) (domain.
 	if err != nil {
 		return domain.User{}, err
 	}
-	return domain.User{
-		Id:       user.Id,
-		Email:    user.Email,
-		Password: user.Password,
-	}, err
+	return u.entityToDomain(user), err
 }
 
 func (u *UserRepository) UpdateById(ctx context.Context, edit domain.User) error {
-	milli := time.Now().UnixMilli()
-	return u.dao.UpdateById(ctx, dao.User{
-		Id:        edit.Id,
-		Email:     edit.Email,
-		NikeName:  edit.NikeName,
-		Birthday:  edit.Birthday,
-		Signature: edit.Signature,
-		Utime:     milli,
-	})
+	return u.dao.UpdateById(ctx, u.domainToEntity(edit))
 }
 
-func (u *UserRepository) FindById(ctx *gin.Context, id int64) (domain.User, error) {
-	user, err := u.dao.FindById(ctx, id)
+func (u *UserRepository) FindById(ctx context.Context, id int64) (domain.User, error) {
+	user, err := u.cache.Get(ctx, id)
+	if err == nil {
+		return user, nil
+	}
+	//if err != redis.ErrKeyNotExist {
+	//
+	//}
+	ue, err := u.dao.FindById(ctx, id)
 	if err != nil {
 		return domain.User{}, err
 	}
+	user = domain.User{
+		Email:     ue.Email.String,
+		NikeName:  ue.NikeName,
+		Birthday:  ue.Birthday,
+		Signature: ue.Signature,
+	}
+	go func() {
+		err = u.cache.Set(ctx, user)
+		if err != nil {
+			// todo 打日志做监控
+		}
+	}()
+	return user, nil
+}
+
+func (u *UserRepository) FindByPhone(ctx context.Context, phone string) (domain.User, error) {
+	user, err := u.dao.FindByPhone(ctx, phone)
+	if err != nil {
+		return domain.User{}, err
+	}
+	return u.entityToDomain(user), nil
+}
+
+func (r *UserRepository) entityToDomain(u dao.User) domain.User {
 	return domain.User{
-		Email:     user.Email,
-		NikeName:  user.NikeName,
-		Birthday:  user.Birthday,
-		Signature: user.Signature,
-	}, nil
+		Id:       u.Id,
+		Email:    u.Email.String,
+		Password: u.Password,
+		Phone:    u.Phone.String,
+		Ctime:    time.UnixMilli(u.Ctime),
+	}
+}
+
+func (r *UserRepository) domainToEntity(u domain.User) dao.User {
+	return dao.User{
+		Id: u.Id,
+		Email: sql.NullString{
+			String: u.Email,
+			// 我确实有手机号
+			Valid: u.Email != "",
+		},
+		Phone: sql.NullString{
+			String: u.Phone,
+			Valid:  u.Phone != "",
+		},
+		NikeName:  u.NikeName,
+		Birthday:  u.Birthday,
+		Signature: u.Signature,
+		Password:  u.Password,
+		Ctime:     u.Ctime.UnixMilli(),
+	}
 }

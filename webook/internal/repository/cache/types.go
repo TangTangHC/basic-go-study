@@ -3,11 +3,12 @@ package cache
 import (
 	"context"
 	"errors"
+	"github.com/TangTangHC/basic-go-study/webook/internal/domain"
 )
 
-type CodeCache interface {
-	Set(ctx context.Context, biz, phone, code string) error
-	Verify(ctx context.Context, biz, phone, inputCode string) (bool, error)
+type UserCache interface {
+	Set(ctx context.Context, user *domain.User) error
+	Get(ctx context.Context, id int64) (*domain.User, error)
 }
 
 var (
