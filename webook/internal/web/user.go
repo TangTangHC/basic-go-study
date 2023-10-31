@@ -20,11 +20,11 @@ var (
 type UserHandler struct {
 	emailExp    *regexp.Regexp
 	passwordExp *regexp.Regexp
-	uSvc        *service.UserService
-	cSvc        *service.CodeService
+	uSvc        service.UserService
+	cSvc        service.CodeService
 }
 
-func NewUserHandler(uSvc *service.UserService, cSvc *service.CodeService) *UserHandler {
+func NewUserHandler(uSvc service.UserService, cSvc service.CodeService) *UserHandler {
 	const (
 		emailRegexPattern    = "^\\w+([-+.]\\w+)*@\\w+([-.]\\w+)*\\.\\w+([-.]\\w+)*$"
 		passwordRegexPattern = `^(?=.*[A-Za-z])(?=.*\d)(?=.*[$@$!%*#?&~])[A-Za-z\d$@$!%*#?&~]{8,}$`

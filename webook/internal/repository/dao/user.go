@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
+
 	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
-	"time"
 )
 
 var (
@@ -14,15 +15,23 @@ var (
 	ErrUserNotFound  = gorm.ErrRecordNotFound
 )
 
-type UserDao struct {
+type UserDao interface {
+	Insert(ctx context.Context, user User) error
+	FindByEmail(context.Context, string) (User, error)
+	UpdateById(context.Context, User) error
+	FindById(context.Context, int64) (User, error)
+	FindByPhone(context.Context, string) (User, error)
+}
+
+type GORMUserDao struct {
 	db *gorm.DB
 }
 
-func NewUserDao(db *gorm.DB) *UserDao {
-	return &UserDao{db: db}
+func NewUserDao(db *gorm.DB) UserDao {
+	return &GORMUserDao{db: db}
 }
 
-func (u *UserDao) Insert(ctx context.Context, user User) error {
+func (u *GORMUserDao) Insert(ctx context.Context, user User) error {
 	milli := time.Now().UnixMilli()
 	user.Ctime = milli
 	user.Utime = milli
@@ -36,23 +45,23 @@ func (u *UserDao) Insert(ctx context.Context, user User) error {
 	return err
 }
 
-func (u *UserDao) FindByEmail(ctx context.Context, email string) (User, error) {
+func (u *GORMUserDao) FindByEmail(ctx context.Context, email string) (User, error) {
 	var user User
 	err := u.db.WithContext(ctx).Where("email = ?", email).First(&user).Error
 	return user, err
 }
 
-func (u *UserDao) UpdateById(ctx context.Context, user User) error {
+func (u *GORMUserDao) UpdateById(ctx context.Context, user User) error {
 	return u.db.WithContext(ctx).Updates(&user).Error
 }
 
-func (u *UserDao) FindById(ctx context.Context, id int64) (User, error) {
+func (u *GORMUserDao) FindById(ctx context.Context, id int64) (User, error) {
 	var user User
 	err := u.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
 	return user, err
 }
 
-func (u *UserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
+func (u *GORMUserDao) FindByPhone(ctx context.Context, phone string) (User, error) {
 	var user User
 	err := u.db.WithContext(ctx).Where("phone = ?", phone).First(&user).Error
 	return user, err

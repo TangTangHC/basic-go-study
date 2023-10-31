@@ -11,12 +11,17 @@ import (
 
 var ErrKeyNotExist = redis.Nil
 
+type UserCache interface {
+	Set(ctx context.Context, user domain.User) error
+	Get(ctx context.Context, id int64) (domain.User, error)
+}
+
 type RedisUserCache struct {
 	cli redis.Cmdable
 	exp time.Duration
 }
 
-func NewUserCache(cli redis.Cmdable) *RedisUserCache {
+func NewUserCache(cli redis.Cmdable) UserCache {
 	return &RedisUserCache{
 		cli: cli,
 		exp: time.Minute * 15,

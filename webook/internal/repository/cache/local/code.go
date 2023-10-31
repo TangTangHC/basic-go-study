@@ -2,7 +2,7 @@ package local
 
 import (
 	"context"
-	"github.com/TangTangHC/basic-go-study/webook/internal/repository/cache"
+	"github.com/TangTangHC/basic-go-study/webook/internal/repository/cache/redis"
 	"sync"
 	"time"
 )
@@ -24,7 +24,7 @@ type queueValue struct {
 	endTime time.Time
 }
 
-func NewLocalCodeCache(sec int) *LocalCodeCache {
+func NewLocalCodeCache(sec int) redis.CodeCache {
 	if sec <= 0 {
 		sec = 60 * 5
 	}
@@ -73,7 +73,7 @@ func (l *LocalCodeCache) Set(ctx context.Context, biz, phone, code string) error
 		v := load.(*value)
 		// 判断时间间隔
 		if now.Before(v.starTime.Add(540 * time.Second)) {
-			return cache.ErrCodeSendTooMany
+			return redis.ErrCodeSendTooMany
 		}
 	}
 	l.hash.Store(key, &value{
@@ -100,7 +100,7 @@ func (l *LocalCodeCache) Verify(ctx context.Context, biz, phone, inputCode strin
 	}
 	if v.visitCount == 0 {
 		l.hash.Delete(key)
-		return false, cache.ErrCodeVerifyTooManyTimes
+		return false, redis.ErrCodeVerifyTooManyTimes
 	}
 	if v.code != inputCode {
 		v.visitCount--
