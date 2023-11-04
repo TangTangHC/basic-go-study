@@ -59,8 +59,8 @@ func (h *UserHandler) SignUp(ctx *gin.Context) {
 		ConfirmPassword string `json:"confirmPassword"`
 	}
 	var userReq UserReq
+	// 绑定失败，放回400
 	if err := ctx.BindJSON(&userReq); err != nil {
-		ctx.String(http.StatusOK, "参数解析异常")
 		return
 	}
 	ok, err := h.emailExp.MatchString(userReq.Email)
@@ -234,16 +234,23 @@ func (h *UserHandler) SendLoginSMSCode(ctx *gin.Context) {
 		return
 	}
 	err := h.cSvc.Send(ctx, biz, req.Phone)
-	if err != nil {
+	switch err {
+	case nil:
+		ctx.JSON(http.StatusOK, Result{
+			Msg: "发送成功",
+		})
+		return
+	//case service.ErrCodeSendTooMany:
+	//	ctx.JSON(http.StatusOK, Result{
+	//		Msg: "发送太频繁，请稍后再试",
+	//	})
+	default:
 		ctx.JSON(http.StatusOK, Result{
 			Code: 5,
 			Msg:  "系统错误",
 		})
 		return
 	}
-	ctx.JSON(http.StatusOK, Result{
-		Msg: "发送成功",
-	})
 }
 
 func (h *UserHandler) LoginSMS(ctx *gin.Context) {
