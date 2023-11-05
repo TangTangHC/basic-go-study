@@ -3,7 +3,9 @@ local code = ARGV[1]
 local cntKey = key..':cnt'
 local targetVal = redis.call('get', key)
 local cnt = tonumber(redis.call('get', cntKey))
-
+if cnt == '' then
+    return -1
+end
 if cnt <= 0 then
     return -1
 elseif targetVal == code then
@@ -11,6 +13,6 @@ elseif targetVal == code then
     redis.call('del', cntKey)
     return 0
 else
-    redis.call('decr', cntKey, -1)
+    redis.call('decr', cntKey)
     return -2
 end

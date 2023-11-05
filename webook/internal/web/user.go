@@ -291,7 +291,6 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
-	ctx.String(http.StatusOK, "登录成功")
 	return
 }
 
@@ -306,7 +305,9 @@ func (u *UserHandler) setJWTToken(ctx *gin.Context, uid int64) error {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS512, claims)
 	signingString, err := token.SignedString([]byte("TyrmfzW2KnkH0HRfIH6lzd5XsQtrM31O"))
 	ctx.Header("x-jwt-token", signingString)
-	ctx.String(http.StatusOK, "登录成功")
+	ctx.JSON(http.StatusOK, Result{
+		Msg: "验证码校验通过",
+	})
 	return err
 }
 
