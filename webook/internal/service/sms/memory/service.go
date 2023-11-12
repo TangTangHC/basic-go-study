@@ -3,16 +3,17 @@ package memory
 import (
 	"context"
 	"fmt"
+	"github.com/TangTangHC/basic-go-study/webook/internal/service/sms"
 )
 
-type Service struct {
+type MomorySmsService struct {
 }
 
-func NewService() *Service {
-	return &Service{}
+func NewService() sms.Service {
+	return &MomorySmsService{}
 }
 
-func (s *Service) Send(ctx context.Context, tpl string, args []string, numbers ...string) error {
+func (s *MomorySmsService) Send(ctx context.Context, tpl string, args []string, numbers ...string) error {
 	fmt.Printf("执行到这了")
 	return nil
 }

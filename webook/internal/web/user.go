@@ -287,7 +287,7 @@ func (h *UserHandler) LoginSMS(ctx *gin.Context) {
 		})
 		return
 	}
-	if err = h.setJWTToken(ctx, user.Id); err != nil {
+	if h.setJWTToken(ctx, user.Id) != nil {
 		ctx.String(http.StatusOK, "系统错误")
 		return
 	}
